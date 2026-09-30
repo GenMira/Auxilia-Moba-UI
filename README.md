@@ -1,32 +1,40 @@
-# React + TypeScript + Vite
+# League of Auxilia UI
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+1対1 MOBAのエントランスとマッチング画面。React / TypeScript / Vite。
 
-Currently, two official plugins are available:
+## 起動
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+別ターミナルで `../League of Auxilia-server` の `go run .` を起動した後、このディレクトリで実行します。
 
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the Oxlint configuration
-
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
-
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+```sh
+npm install
+npm run dev
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+表示されたURLを開き、名前入力 → キャラ・スペル選択 → マッチング開始の順に操作します。
+開発時はViteが `/api` と `/ws` を `127.0.0.1:8080` へ転送します。
+
+2人の動作確認には通常ブラウザーとプライベートウィンドウ、または別ブラウザーを使ってください。同一Cookieを共有する複数タブは同じプレイヤーとして同期され、自分同士ではマッチングしません。
+
+## 実装範囲
+
+- 4キャラ選択、異なるD/Fスペル、名前1〜16文字、BGM/SE音量保存・再生。
+- 先着順の待機列、キャンセル、ランダムなblue/red割り当て。
+- 両者の名前・キャラ・スペル・画像ロード状況、30秒のロード期限、3秒カウントダウン。
+- `ready` は戦闘への引き渡し地点。戦闘はまだ実装せず、対戦準備完了を表示します。
+- この段階のロード中・カウントダウン中・準備完了後は、最後の接続が切れたプレイヤーのマッチを無効にして相手を戻します。戦闘開始後の30秒復帰猶予とは別の処理です。
+- `ready` のマッチは5分で解放。明示退出でも両者をエントランスへ戻し、自動再待機しません。
+
+本番配信では同一オリジンでUIを配信し、`/api/*` と `/ws` をGoへリバースプロキシしてください。WebSocketアップグレードが必要です。開発用Viteのproxy設定はビルド成果物へは含まれません。
+
+## 検証
+
+```sh
+npm run build
+npm run lint
+npm run test:e2e
+```
+
+E2EはUI・Goサーバー起動済みの状態で実行します。デフォルトはインストール済みMicrosoft Edgeをheadless起動します。`BROWSER_CHANNEL=chrome` でChrome、`TEST_URL` で接続URLを変更できます。2つの独立ブラウザーコンテキストと同一セッションの追加タブで確認し、スクリーンショットは `test-results/` に保存します。
+
+キャラ性能は `src/catalog.ts`、仕様書は `specification/`。キャラ画像・メニュー音源は既存Auxiliaの素材を使用しています。
