@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { asset, characters, spells, validName } from "./catalog";
 import { useLobby } from "./useLobby";
 import "./App.css";
+import { GameScene } from "./GameScene";
 
 function stored(key: string, fallback: string) {
   try {
@@ -98,7 +99,7 @@ export default function App() {
             const image = new Image();
             image.onload = () => resolve();
             image.onerror = reject;
-            image.src = asset(`characters/${p.character}.png`);
+            image.src = asset(`characters-mini/${p.character}_mini.png`);
           }),
       ),
     )
@@ -254,16 +255,22 @@ export default function App() {
             />
           </div>
         </section>
+      ) : match && phase === "playing" ? (
+        lobby.world && lobby.world.matchId === match.id ? (
+          <GameScene
+            world={lobby.world}
+            selfId={state!.selfId}
+            spells={match.players.find((p) => p.id === state!.selfId)!.spells}
+            connected={lobby.connected}
+            input={lobby.input}
+          />
+        ) : (
+          <p role="status">戦場を準備しています…</p>
+        )
       ) : match ? (
         <section className="match-screen">
           <p className="eyebrow">MATCH FOUND / 1 VS 1</p>
-          <h1>
-            {phase === "ready"
-              ? "対戦準備完了"
-              : phase === "countdown"
-                ? "まもなく準備完了"
-                : "マッチング成立"}
-          </h1>
+          <h1>{phase === "countdown" ? "まもなく開始" : "マッチング成立"}</h1>
           <div className="versus">
             {match.players.map((p) => {
               const c = characters.find((v) => v.id === p.character)!;
@@ -298,11 +305,9 @@ export default function App() {
             <span className="vs">VS</span>
           </div>
           <div className="match-status" role="status">
-            {phase === "ready"
-              ? "ここまでが今回の実装範囲です。戦闘画面は次の実装で接続します。"
-              : phase === "countdown"
-                ? `準備完了まで ${Math.max(0, Math.ceil((match.deadline - now) / 1000))} 秒`
-                : `両プレイヤーのロードを待っています（残り ${Math.max(0, Math.ceil((match.deadline - now) / 1000))} 秒）`}
+            {phase === "countdown"
+              ? `開始まで ${Math.max(0, Math.ceil((match.deadline - now) / 1000))} 秒`
+              : `両プレイヤーのロードを待っています（残り ${Math.max(0, Math.ceil((match.deadline - now) / 1000))} 秒）`}
           </div>
           <button disabled={!lobby.connected || lobby.busy} onClick={back}>
             エントランスへ戻る

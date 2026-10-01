@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import type { World } from "./world";
 
 export type Selection = { name: string; character: string; spells: string[] };
 export type Player = Selection & {
@@ -36,6 +37,8 @@ function session() {
 export function useLobby() {
   const socket = useRef<WebSocket | null>(null);
   const [state, setState] = useState<State | null>(null);
+  const [world, setWorld] = useState<World | null>(null);
+  const sequence = useRef(0);
   const [connected, setConnected] = useState(false);
   const [active, setActive] = useState<number | null>(null);
   const [error, setError] = useState("");
@@ -59,11 +62,18 @@ export function useLobby() {
           if (disposed) return;
           const message = JSON.parse(event.data);
           if (message.type === "state") {
+            if (message.phase !== "playing") {
+              setWorld(null);
+              sequence.current = 0;
+            }
             setState(message);
             setConnected(true);
             setBusy(false);
             clearTimeout(pending.current);
             if (message.notice) setError(message.notice);
+          } else if (message.type === "world") {
+            setWorld(message);
+            sequence.current = Math.max(sequence.current, message.ack);
           } else if (message.type === "presence") setActive(message.active);
           else if (message.type === "error") {
             setError(message.message);
@@ -114,6 +124,13 @@ export function useLobby() {
     }, 8000);
   }
   return {
+    world,
+    input: (command: object) => {
+      if (connected && socket.current?.readyState === WebSocket.OPEN)
+        socket.current.send(
+          JSON.stringify({ ...command, sequence: ++sequence.current }),
+        );
+    },
     state,
     connected,
     active,

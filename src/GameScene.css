@@ -1,0 +1,230 @@
+.game-scene {
+  margin-top: 12px;
+}
+.battle-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 15px;
+  font-size: 12px;
+  padding: 4px 0 12px;
+}
+.battle-top .eyebrow {
+  margin: 0;
+}
+.battle-top > div {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.battle-top button {
+  padding: 6px 10px;
+  font-size: 11px;
+}
+.battle-viewport {
+  position: relative;
+  height: calc(100vh - 290px);
+  min-height: 310px;
+  border: 1px solid #6a7460;
+  overflow: hidden;
+  background: #182126;
+}
+.battle-viewport canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  cursor: crosshair;
+}
+.minimap {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  width: 160px;
+  height: 160px;
+  border: 1px solid #adb38c;
+  cursor: pointer;
+  box-shadow: 0 3px 12px #0008;
+}
+.target-card {
+  position: absolute;
+  left: 12px;
+  top: 46px;
+  background: #0e191de6;
+  border: 1px solid #69887e;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 12px;
+  pointer-events: none;
+}
+.death-overlay,
+.connection-overlay {
+  position: absolute;
+  left: 50%;
+  top: 28%;
+  transform: translateX(-50%);
+  padding: 22px 50px;
+  background: #13191ce3;
+  border: 1px solid #ae9182;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  pointer-events: none;
+}
+.death-overlay strong {
+  font-size: 28px;
+}
+.connection-overlay {
+  top: 5%;
+  font-size: 14px;
+}
+.battle-hud {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  padding: 12px 15px;
+  border: 1px solid #545d4d;
+  border-top: 0;
+  background: #172020;
+}
+.hud-portrait {
+  position: relative;
+  width: 78px;
+  flex-shrink: 0;
+}
+.hud-portrait img {
+  width: 78px;
+  height: 88px;
+  object-fit: contain;
+}
+.hud-portrait span {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  background: #192a2b;
+  border: 1px solid #a8b77e;
+  font-size: 11px;
+  padding: 2px 5px;
+}
+.hud-vitals {
+  width: 220px;
+}
+.hud-vitals > strong {
+  font-size: 14px;
+  font-weight: 500;
+}
+.meter {
+  position: relative;
+  background: #0c1419;
+  height: 17px;
+  margin-top: 5px;
+  overflow: hidden;
+  border: 1px solid #647061;
+}
+.meter i {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: #668c52;
+  transition: width 0.1s;
+}
+.meter.mana i {
+  background: #366585;
+}
+.meter span {
+  position: relative;
+  display: block;
+  text-align: center;
+  font-size: 10px;
+  line-height: 15px;
+  color: #fff;
+  text-shadow: 0 1px 2px #000;
+}
+.hud-vitals > small {
+  font-size: 9px;
+  color: #a9baaa;
+}
+.hud-abilities {
+  display: flex;
+  gap: 6px;
+}
+.hud-abilities button {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: center;
+  padding: 9px 8px;
+  min-width: 42px;
+}
+.hud-abilities small {
+  font-size: 9px;
+}
+.hud-inventory {
+  font-size: 12px;
+  color: #e1cf9a;
+}
+.hud-inventory > div {
+  display: grid;
+  grid-template-columns: repeat(2, 23px);
+  gap: 3px;
+  margin-top: 5px;
+}
+.hud-inventory span {
+  width: 23px;
+  height: 17px;
+  background: #101819;
+  border: 1px solid #536453;
+}
+.battle-help {
+  text-align: center;
+  font-size: 10px;
+  color: #a1b0a3;
+  padding: 10px 0;
+}
+@media (max-width: 1100px) {
+  .battle-hud {
+    gap: 10px;
+    padding: 10px;
+  }
+  .hud-vitals {
+    width: 185px;
+  }
+  .hud-portrait {
+    width: 58px;
+  }
+  .hud-portrait img {
+    width: 58px;
+    height: 76px;
+  }
+  .minimap {
+    width: 125px;
+    height: 125px;
+  }
+  .hud-abilities button {
+    padding: 8px 5px;
+    min-width: 35px;
+  }
+  .battle-top {
+    font-size: 10px;
+  }
+}
+@media (max-width: 700px) {
+  .battle-hud {
+    flex-wrap: wrap;
+  }
+  .battle-viewport {
+    height: 50vh;
+    min-height: 300px;
+  }
+  .battle-top .eyebrow {
+    display: none;
+  }
+  .hud-inventory {
+    display: none;
+  }
+  .battle-help {
+    line-height: 1.8;
+  }
+}
