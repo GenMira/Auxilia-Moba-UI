@@ -74,6 +74,8 @@ export function useLobby() {
           } else if (message.type === "world") {
             setWorld(message);
             sequence.current = Math.max(sequence.current, message.ack);
+          } else if (message.type === "commandResult") {
+            if (!message.ok) setError(message.reason);
           } else if (message.type === "presence") setActive(message.active);
           else if (message.type === "error") {
             setError(message.message);

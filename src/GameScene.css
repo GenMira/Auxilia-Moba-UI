@@ -228,3 +228,43 @@
     line-height: 1.8;
   }
 }
+.skill-feedback {
+  position: absolute;
+  top: 45px;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: 80%;
+  padding: 8px 14px;
+  color: #e6fce9;
+  background: #14251fe8;
+  border: 1px solid #699f88;
+  border-radius: 6px;
+  pointer-events: none;
+  text-align: center;
+  font-size: 13px;
+}
+.skill-button[aria-disabled="true"] {
+  opacity: 0.55;
+}
+.skill-button[aria-pressed="true"] {
+  border-color: #9cf1ce;
+  box-shadow: 0 0 0 2px #79cfa94d;
+}
+.status-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 6px 0;
+  font-size: 12px;
+}
+.status-strip span {
+  background: #24352d;
+  padding: 4px 8px;
+  border-radius: 4px;
+  color: #d5ebcc;
+}
+.status-strip .status-slow,
+.status-strip .status-poison {
+  background: #492d36;
+  color: #ffc6cd;
+}

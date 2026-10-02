@@ -1,4 +1,34 @@
 export type Point = { s: number; t: number };
+export type Skill = {
+  slot: string;
+  name: string;
+  aim: "self" | "direction" | "point" | "target";
+  shape: string;
+  range: number;
+  radius: number;
+  width: number;
+  angle: number;
+  mana: number;
+  cooldown: number;
+  duration: number;
+  description: string;
+  rank: number;
+  amount: number;
+  readyAt: number;
+  reason: string;
+};
+export type SkillEffect = {
+  id: number;
+  owner: string;
+  shape: string;
+  origin: Point;
+  direction: Point;
+  range: number;
+  radius: number;
+  width: number;
+  angle: number;
+  until: number;
+};
 export type Structure = {
   id: string;
   team: string;
@@ -16,6 +46,23 @@ export type Arena = {
   bushes: { minS: number; maxS: number; minT: number; maxT: number }[];
 };
 export type Actor = {
+  skills?: Skill[];
+  moveSpeed: number;
+  statuses: {
+    id: string;
+    source: string;
+    kind: string;
+    until: number;
+    value: number;
+  }[];
+  cast: {
+    slot: string;
+    shape: string;
+    origin: Point;
+    direction: Point;
+    destination: Point;
+    endsAt: number;
+  } | null;
   id: string;
   team: string;
   character: string;
@@ -52,7 +99,15 @@ export type World = {
   ack: number;
   actors: Actor[];
   map: Arena;
-  projectiles: { id: number; owner: string; target: string; position: Point }[];
+  effects: SkillEffect[];
+  projectiles: {
+    id: number;
+    owner: string;
+    target: string;
+    position: Point;
+    kind: string;
+    width: number;
+  }[];
 };
 export const project = (p: Point) => ({
   x: (p.s + p.t) / Math.SQRT2,

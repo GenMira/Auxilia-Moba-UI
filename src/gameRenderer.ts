@@ -1,6 +1,6 @@
 import { asset, characters } from "./catalog";
 import { project, unproject, interpolatePosition } from "./world";
-import type { Actor, Point, World } from "./world";
+import type { Actor, Point, World, SkillEffect } from "./world";
 export type Camera = {
   x: number;
   y: number;
@@ -20,6 +20,7 @@ export type RenderState = {
   keys: Ref<Set<string>>;
   mouse: Ref<{ x: number; y: number; inside: boolean }>;
   range: Ref<boolean>;
+  aim: Ref<string>;
 };
 
 export function mountRenderer(canvas: HTMLCanvasElement, state: RenderState) {
@@ -337,8 +338,112 @@ export function mountRenderer(canvas: HTMLCanvasElement, state: RenderState) {
         q.y - 158 * z - 7,
       );
     }
+    function skillShape(
+      e: Omit<SkillEffect, "id" | "owner" | "until">,
+      preview: boolean,
+    ) {
+      const fill = preview
+        ? "#86dfca24"
+        : e.shape === "heal"
+          ? "#93f1a866"
+          : "#e6bc7966";
+      const stroke = preview ? "#91ffe1" : "#ffe4ac";
+      if (e.shape === "circle" || e.shape === "heal")
+        circle(e.origin, e.radius || 65, fill, stroke);
+      else if (e.shape === "cone") {
+        const angle = Math.atan2(e.direction.t, e.direction.s),
+          half = (e.angle * Math.PI) / 360;
+        const points = [e.origin];
+        for (let i = 0; i <= 24; i++) {
+          const theta = angle - half + (2 * half * i) / 24;
+          points.push({
+            s: e.origin.s + Math.cos(theta) * e.range,
+            t: e.origin.t + Math.sin(theta) * e.range,
+          });
+        }
+        polygon(points, fill, stroke);
+      } else {
+        const end = {
+          s: e.origin.s + e.direction.s * e.range,
+          t: e.origin.t + e.direction.t * e.range,
+        };
+        const from = screen(e.origin),
+          to = screen(end);
+        ctx.beginPath();
+        ctx.moveTo(from.x, from.y);
+        ctx.lineTo(to.x, to.y);
+        ctx.lineCap = "round";
+        ctx.lineWidth = Math.max(1, e.width * c.zoom);
+        ctx.strokeStyle = fill;
+        ctx.stroke();
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = stroke;
+        ctx.stroke();
+        ctx.lineCap = "butt";
+      }
+    }
+    for (const e of w.effects || []) skillShape(e, false);
+    const skill = me.skills?.find((s) => s.slot === state.aim.current);
+    if (skill && me.hp > 0 && !me.cast) {
+      const cursor = unproject(
+        (mouse.current.x - c.width / 2) / c.zoom + c.x,
+        (mouse.current.y - c.height / 2) / c.zoom + c.y,
+      );
+      const origin = me.position,
+        ds = cursor.s - origin.s,
+        dt = cursor.t - origin.t,
+        d = Math.hypot(ds, dt);
+      const direction = d > 1e-8 ? { s: ds / d, t: dt / d } : me.facing;
+      const dest = {
+        s: origin.s + direction.s * Math.min(d, skill.range),
+        t: origin.t + direction.t * Math.min(d, skill.range),
+      };
+      let length = skill.range;
+      if (skill.shape === "line") {
+        for (const o of w.map.structures) {
+          const x = origin.s - o.position.s,
+            y = origin.t - o.position.t,
+            r = o.radius + skill.width / 2,
+            b = x * direction.s + y * direction.t,
+            q = x * x + y * y - r * r,
+            disc = b * b - q;
+          if (q <= 0) length = 0;
+          else if (disc >= 0) {
+            const t = -b - Math.sqrt(disc);
+            if (t >= 0) length = Math.min(length, t);
+          }
+        }
+        if (direction.s > 0)
+          length = Math.min(length, (w.map.length - origin.s) / direction.s);
+        else if (direction.s < 0)
+          length = Math.min(length, -origin.s / direction.s);
+        if (direction.t > 0)
+          length = Math.min(length, (w.map.width / 2 - origin.t) / direction.t);
+        else if (direction.t < 0)
+          length = Math.min(
+            length,
+            (-w.map.width / 2 - origin.t) / direction.t,
+          );
+      }
+      if (skill.aim === "point" || skill.aim === "target")
+        circle(origin, skill.range, "#0000", "#91ffe177");
+      skillShape(
+        {
+          ...skill,
+          origin: skill.aim === "point" ? dest : origin,
+          direction,
+          range: Math.max(0, length),
+        },
+        true,
+      );
+    }
     for (const p of w.projectiles) {
-      circle(p.position, 9, "#f9dfa7", "#fff3c8");
+      circle(
+        p.position,
+        p.kind === "skill" ? p.width / 2 : 9,
+        p.kind === "skill" ? "#a8ef9477" : "#f9dfa7",
+        "#fff3c8",
+      );
     }
     if (marker.current && now - marker.current.at < 1100) {
       circle(

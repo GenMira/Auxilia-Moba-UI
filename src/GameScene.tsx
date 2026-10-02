@@ -37,6 +37,35 @@ export function GameScene(props: Props) {
   const [showRange, setShowRange] = useState(false);
   const range = useRef(false);
   const [selectedId, setSelectedId] = useState("");
+  const [aimSlot, setAimSlot] = useState("");
+  const aim = useRef("");
+  const [skillNotice, setSkillNotice] = useState("");
+  function chooseSkill(slot: string) {
+    const p = latest.current;
+    const actor = p.world.actors.find((a) => a.id === p.selfId)!;
+    const skill = actor.skills?.find((s) => s.slot === slot);
+    const reason = !p.connected
+      ? "接続待ち"
+      : skill?.reason || (!skill ? "未実装" : "");
+    if (reason) {
+      setSkillNotice(reason);
+      return;
+    }
+    setSkillNotice("");
+    if (skill!.aim === "self") {
+      aim.current = "";
+      setAimSlot("");
+      p.input({ type: "cast", slot, matchId: p.world.matchId });
+    } else {
+      aim.current = slot;
+      setAimSlot(slot);
+    }
+  }
+  // A stable handler reads current snapshots from refs, including after reconnect.
+  const chooseSkillRef = useRef(chooseSkill);
+  useEffect(() => {
+    chooseSkillRef.current = chooseSkill;
+  });
   useEffect(() => {
     if (props.world !== latest.current.world) {
       previous.current = latest.current.world;
@@ -85,6 +114,7 @@ export function GameScene(props: Props) {
       keys,
       mouse,
       range,
+      aim,
     });
     const keydown = (e: KeyboardEvent) => {
       if (
@@ -106,6 +136,20 @@ export function GameScene(props: Props) {
         setLocked(camera.current.locked);
       }
       const p = latest.current;
+      if (
+        ["q", "w", "e"].includes(k) &&
+        !e.ctrlKey &&
+        !e.altKey &&
+        !e.metaKey
+      ) {
+        e.preventDefault();
+        chooseSkillRef.current(k);
+        return;
+      }
+      if (k === "escape" || k === "s") {
+        aim.current = "";
+        setAimSlot("");
+      }
       if (p.connected && ["s", "b"].includes(k))
         p.input({
           type: k === "s" ? "stop" : "recall",
@@ -143,6 +187,10 @@ export function GameScene(props: Props) {
   }, []);
   const selected = world.actors.find((a) => a.id === selectedId);
   const character = characters.find((a) => a.id === self.character)!;
+  const aiming =
+    self.hp > 0 && !self.cast && connected
+      ? self.skills?.find((s) => s.slot === aimSlot)
+      : undefined;
   const time = `${Math.floor(world.time / 60)}:${String(Math.floor(world.time % 60)).padStart(2, "0")}`;
   return (
     <section
@@ -152,6 +200,8 @@ export function GameScene(props: Props) {
       data-self-t={self.position.t}
       data-hp={self.hp}
       data-team={self.team}
+      data-mana={self.mana}
+      data-cast={self.cast?.slot || ""}
     >
       <div className="battle-top">
         <span className="eyebrow">SINGLE LANE / {self.team.toUpperCase()}</span>
@@ -197,6 +247,11 @@ export function GameScene(props: Props) {
           }}
           onContextMenu={(e) => {
             e.preventDefault();
+            if (aim.current) {
+              aim.current = "";
+              setAimSlot("");
+              return;
+            }
             const p = locate(e.clientX, e.clientY);
             const enemy = pickActor(e.clientX, e.clientY, true);
             if (enemy) {
@@ -204,13 +259,32 @@ export function GameScene(props: Props) {
               setSelectedId(enemy.id);
             } else {
               order("move", { position: p });
-              marker.current = { point: p, at: performance.now() };
+              marker.current = { point: p, at: e.timeStamp };
             }
           }}
           onClick={(e) => {
+            if (aiming) {
+              order("cast", {
+                slot: aiming.slot,
+                position: locate(e.clientX, e.clientY),
+                target: pickActor(e.clientX, e.clientY, true)?.id,
+              });
+              aim.current = "";
+              setAimSlot("");
+              return;
+            }
             setSelectedId(pickActor(e.clientX, e.clientY)?.id ?? "");
           }}
         />
+        {(aiming || self.cast || skillNotice) && (
+          <div className="skill-feedback" role="status">
+            {self.cast
+              ? `${self.skills?.find((s) => s.slot === self.cast!.slot)?.name || self.cast.slot} 発動中 ${Math.max(0, self.cast.endsAt - world.time).toFixed(1)}秒`
+              : aiming
+                ? `${aiming.name}：左クリックで確定・右クリック/Escで取消`
+                : skillNotice}
+          </div>
+        )}
         {self.hp <= 0 && (
           <div className="death-overlay" role="status">
             <strong>戦闘不能</strong>
@@ -343,17 +417,45 @@ export function GameScene(props: Props) {
             </span>
           </div>
           <small>
-            攻撃 {self.stats.attack}　速度 {self.stats.speed}　射程{" "}
+            攻撃 {self.stats.attack}　速度 {Math.round(self.moveSpeed)}　射程{" "}
             {self.stats.range}U
           </small>
         </div>
         <div className="hud-abilities">
-          {character.skills.map((name, i) => (
-            <button key={name} disabled title={`${name}（未実装）`}>
-              <kbd>{"QWE"[i]}</kbd>
-              <small>未実装</small>
-            </button>
-          ))}
+          {character.skills.map((name, i) => {
+            const slot = "qwe"[i],
+              skill = self.skills?.find((s) => s.slot === slot);
+            const reason = !connected
+              ? "接続待ち"
+              : skill?.reason || (!skill ? "未実装" : "");
+            return (
+              <button
+                key={name}
+                className="skill-button"
+                aria-label={`${slot.toUpperCase()} ${name}`}
+                aria-pressed={aimSlot === slot}
+                aria-disabled={!!reason}
+                onClick={() => chooseSkill(slot)}
+                title={
+                  skill
+                    ? `${skill.name} / ランク${skill.rank}\n${skill.description}\n${skill.shape === "heal" ? "回復" : "ダメージ"} ${Math.round(skill.amount)} / マナ${skill.mana} / CD${skill.cooldown}秒 / 発動${skill.duration}秒\n${reason || "使用可能"}`
+                    : `${name}（未実装）`
+                }
+              >
+                <kbd>{slot.toUpperCase()}</kbd>
+                <small>
+                  {skill ? `Lv.${skill.rank} · ${skill.mana}MP` : "未実装"}
+                </small>
+                {skill && (
+                  <small>
+                    {skill.readyAt > world.time
+                      ? `${(skill.readyAt - world.time).toFixed(1)}s`
+                      : reason || "使用可能"}
+                  </small>
+                )}
+              </button>
+            );
+          })}
           {props.spells.map((id, i) => (
             <button
               disabled
@@ -365,7 +467,7 @@ export function GameScene(props: Props) {
             </button>
           ))}
           <button
-            disabled={!connected || self.hp <= 0}
+            disabled={!connected || self.hp <= 0 || !!self.cast}
             onClick={() => order("recall")}
             title="8秒で本拠地へ。回復なし"
           >
@@ -386,9 +488,44 @@ export function GameScene(props: Props) {
           </div>
         </div>
       </footer>
+      <div className="status-strip" aria-label="パッシブ・状態効果">
+        {self.character === "Sophie" && (
+          <span title="敵キャラへの通常攻撃・スキル命中で移動速度+30、2秒。重複せず更新。">
+            播種：命中時に加速
+          </span>
+        )}
+        {self.character === "Jude" && (
+          <span title="通常ダメージをイベントごとに10軽減。毒・確定ダメージは軽減しない。">
+            受け身：通常ダメージ−10
+          </span>
+        )}
+        {(self.statuses || []).map((s) => (
+          <span key={`${s.source}:${s.id}`} className={`status-${s.kind}`}>
+            {(
+              {
+                slow: "スロウ",
+                speed: "移動加速",
+                poison: "毒",
+                stun: "スタン",
+                silence: "サイレンス",
+                root: "ルート",
+                shield: "シールド",
+                ignite: "イグナイト",
+              } as Record<string, string>
+            )[s.kind] || s.kind}
+            {s.kind === "slow"
+              ? ` ${Math.round(s.value * 100)}%`
+              : s.kind === "speed"
+                ? ` +${s.value}`
+                : ""}{" "}
+            · {Math.max(0, s.until - world.time).toFixed(1)}秒
+          </span>
+        ))}
+      </div>
       <p className="battle-help">
-        右クリック：移動 / 敵に通常攻撃　 S：停止　 B：リコール　
-        Y：カメラ切替　 Space：自分へ　 ホイール：拡大縮小
+        右クリック：移動 / 敵に通常攻撃　 Q/W/E：スキル　 左クリック：照準確定　
+        Esc：照準取消　 S：停止　 B：リコール　 Y：カメラ切替　 Space：自分へ　
+        ホイール：拡大縮小
       </p>
     </section>
   );
