@@ -1,5 +1,5 @@
 import { asset, characters } from "./catalog";
-import { project, unproject, interpolatePosition } from "./world";
+import { project, unproject, interpolatePosition, blinkLanding } from "./world";
 import type { Actor, Point, World, SkillEffect } from "./world";
 export type Camera = {
   x: number;
@@ -298,6 +298,10 @@ export function mountRenderer(canvas: HTMLCanvasElement, state: RenderState) {
       );
       if (a.recallUntil > 0)
         circle(position(a), 55 + Math.sin(now / 180) * 8, "#0000", "#b3e4ff");
+      if (a.statuses.some((s) => s.kind === "shield" && s.value > 0))
+        circle(position(a), 65, "#90caff20", "#b9d9ff");
+      if (a.statuses.some((s) => s.kind === "poison"))
+        circle(position(a), 43, "#bb73d522", "#ce93e7");
       if (a.attackUntil > w.time) {
         const facing = project(a.facing);
         const angle = Math.atan2(facing.y, facing.x);
@@ -362,6 +366,8 @@ export function mountRenderer(canvas: HTMLCanvasElement, state: RenderState) {
           });
         }
         polygon(points, fill, stroke);
+      } else if (e.shape === "target") {
+        if (!preview) circle(e.origin, 45, fill, stroke);
       } else {
         const end = {
           s: e.origin.s + e.direction.s * e.range,
@@ -383,7 +389,9 @@ export function mountRenderer(canvas: HTMLCanvasElement, state: RenderState) {
       }
     }
     for (const e of w.effects || []) skillShape(e, false);
-    const skill = me.skills?.find((s) => s.slot === state.aim.current);
+    const skill = [...(me.skills || []), ...(me.spells || [])].find(
+      (s) => s.slot === state.aim.current,
+    );
     if (skill && me.hp > 0 && !me.cast) {
       const cursor = unproject(
         (mouse.current.x - c.width / 2) / c.zoom + c.x,
@@ -427,10 +435,57 @@ export function mountRenderer(canvas: HTMLCanvasElement, state: RenderState) {
       }
       if (skill.aim === "point" || skill.aim === "target")
         circle(origin, skill.range, "#0000", "#91ffe177");
+      let shapeOrigin = skill.aim === "point" ? dest : origin;
+      if (skill.blinkDistance > 0 && skill.aim === "direction") {
+        shapeOrigin = blinkLanding(
+          origin,
+          {
+            s: origin.s + direction.s * skill.blinkDistance,
+            t: origin.t + direction.t * skill.blinkDistance,
+          },
+          w.map,
+        );
+        circle(shapeOrigin, w.map.characterRadius, "#91ffe122", "#91ffe1");
+      }
+      if (skill.aim === "target") {
+        const target = w.actors.find(
+          (a) =>
+            a.team !== me.team &&
+            a.hp > 0 &&
+            Math.hypot(a.position.s - cursor.s, a.position.t - cursor.t) < 100,
+        );
+        if (target) {
+          const dist = Math.hypot(
+            target.position.s - origin.s,
+            target.position.t - origin.t,
+          );
+          circle(
+            target.position,
+            50,
+            "#0000",
+            dist <= skill.range ? "#91ffe1" : "#ff978a",
+          );
+          if (skill.blinkDistance > 0 && dist > 0) {
+            const travel = Math.min(
+              skill.blinkDistance,
+              Math.max(0, dist - 150),
+            );
+            const land = blinkLanding(
+              origin,
+              {
+                s: origin.s + ((target.position.s - origin.s) * travel) / dist,
+                t: origin.t + ((target.position.t - origin.t) * travel) / dist,
+              },
+              w.map,
+            );
+            circle(land, skill.hitRange, "#91ffe111", "#91ffe177");
+          }
+        }
+      }
       skillShape(
         {
           ...skill,
-          origin: skill.aim === "point" ? dest : origin,
+          origin: shapeOrigin,
           direction,
           range: Math.max(0, length),
         },

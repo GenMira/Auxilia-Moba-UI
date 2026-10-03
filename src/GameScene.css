@@ -268,3 +268,17 @@
   background: #492d36;
   color: #ffc6cd;
 }
+.ability-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.hud-abilities .upgrade-button {
+  padding: 1px;
+  min-height: 18px;
+  font-size: 13px;
+  color: #f3dc8d;
+}
+.growth-info {
+  display: block;
+}

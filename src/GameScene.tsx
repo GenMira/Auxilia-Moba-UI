@@ -1,6 +1,6 @@
 import { mountRenderer } from "./gameRenderer";
 import { useEffect, useRef, useState } from "react";
-import { asset, characters, spells as spellCatalog } from "./catalog";
+import { asset, characters } from "./catalog";
 import { mini, project, unproject } from "./world";
 import type { Point, World } from "./world";
 import "./GameScene.css";
@@ -43,7 +43,10 @@ export function GameScene(props: Props) {
   function chooseSkill(slot: string) {
     const p = latest.current;
     const actor = p.world.actors.find((a) => a.id === p.selfId)!;
-    const skill = actor.skills?.find((s) => s.slot === slot);
+    const skill = [...(actor.skills || []), ...(actor.spells || [])].find(
+      (s) => s.slot === slot,
+    );
+    const type = "df".includes(slot) ? "spell" : "cast";
     const reason = !p.connected
       ? "接続待ち"
       : skill?.reason || (!skill ? "未実装" : "");
@@ -52,10 +55,19 @@ export function GameScene(props: Props) {
       return;
     }
     setSkillNotice("");
-    if (skill!.aim === "self") {
+    if (skill!.shape === "blink") {
+      const c = camera.current;
+      const position = unproject(
+        (mouse.current.x - c.width / 2) / c.zoom + c.x,
+        (mouse.current.y - c.height / 2) / c.zoom + c.y,
+      );
       aim.current = "";
       setAimSlot("");
-      p.input({ type: "cast", slot, matchId: p.world.matchId });
+      p.input({ type, slot, position, matchId: p.world.matchId });
+    } else if (skill!.aim === "self") {
+      aim.current = "";
+      setAimSlot("");
+      p.input({ type, slot, matchId: p.world.matchId });
     } else {
       aim.current = slot;
       setAimSlot(slot);
@@ -136,8 +148,14 @@ export function GameScene(props: Props) {
         setLocked(camera.current.locked);
       }
       const p = latest.current;
+      if (["q", "w", "e"].includes(k) && e.ctrlKey && !e.altKey && !e.metaKey) {
+        e.preventDefault();
+        if (p.connected)
+          p.input({ type: "upgrade", slot: k, matchId: p.world.matchId });
+        return;
+      }
       if (
-        ["q", "w", "e"].includes(k) &&
+        ["q", "w", "e", "d", "f"].includes(k) &&
         !e.ctrlKey &&
         !e.altKey &&
         !e.metaKey
@@ -189,7 +207,9 @@ export function GameScene(props: Props) {
   const character = characters.find((a) => a.id === self.character)!;
   const aiming =
     self.hp > 0 && !self.cast && connected
-      ? self.skills?.find((s) => s.slot === aimSlot)
+      ? [...(self.skills || []), ...(self.spells || [])].find(
+          (s) => s.slot === aimSlot,
+        )
       : undefined;
   const time = `${Math.floor(world.time / 60)}:${String(Math.floor(world.time % 60)).padStart(2, "0")}`;
   return (
@@ -264,7 +284,7 @@ export function GameScene(props: Props) {
           }}
           onClick={(e) => {
             if (aiming) {
-              order("cast", {
+              order("df".includes(aiming.slot) ? "spell" : "cast", {
                 slot: aiming.slot,
                 position: locate(e.clientX, e.clientY),
                 target: pickActor(e.clientX, e.clientY, true)?.id,
@@ -420,6 +440,10 @@ export function GameScene(props: Props) {
             攻撃 {self.stats.attack}　速度 {Math.round(self.moveSpeed)}　射程{" "}
             {self.stats.range}U
           </small>
+          <small className="growth-info">
+            {self.level >= 7 ? "XP MAX" : `XP ${self.xp} / ${100 * self.level}`}{" "}
+            · 強化ポイント {self.skillPoints}
+          </small>
         </div>
         <div className="hud-abilities">
           {character.skills.map((name, i) => {
@@ -429,41 +453,60 @@ export function GameScene(props: Props) {
               ? "接続待ち"
               : skill?.reason || (!skill ? "未実装" : "");
             return (
-              <button
-                key={name}
-                className="skill-button"
-                aria-label={`${slot.toUpperCase()} ${name}`}
-                aria-pressed={aimSlot === slot}
-                aria-disabled={!!reason}
-                onClick={() => chooseSkill(slot)}
-                title={
-                  skill
-                    ? `${skill.name} / ランク${skill.rank}\n${skill.description}\n${skill.shape === "heal" ? "回復" : "ダメージ"} ${Math.round(skill.amount)} / マナ${skill.mana} / CD${skill.cooldown}秒 / 発動${skill.duration}秒\n${reason || "使用可能"}`
-                    : `${name}（未実装）`
-                }
-              >
-                <kbd>{slot.toUpperCase()}</kbd>
-                <small>
-                  {skill ? `Lv.${skill.rank} · ${skill.mana}MP` : "未実装"}
-                </small>
-                {skill && (
+              <div key={name} className="ability-cell">
+                <button
+                  className="skill-button"
+                  aria-label={`${slot.toUpperCase()} ${name}`}
+                  aria-pressed={aimSlot === slot}
+                  aria-disabled={!!reason}
+                  onClick={() => chooseSkill(slot)}
+                  title={
+                    skill
+                      ? `${skill.name} / ランク${skill.rank}\n${skill.description}\n${skill.shape === "heal" ? "回復" : "ダメージ"} ${Math.round(skill.amount)} / マナ${skill.mana} / CD${skill.cooldown}秒 / 発動${skill.duration}秒\n${reason || "使用可能"}`
+                      : `${name}（未実装）`
+                  }
+                >
+                  <kbd>{slot.toUpperCase()}</kbd>
                   <small>
-                    {skill.readyAt > world.time
-                      ? `${(skill.readyAt - world.time).toFixed(1)}s`
-                      : reason || "使用可能"}
+                    {skill ? `Lv.${skill.rank} · ${skill.mana}MP` : "未実装"}
                   </small>
-                )}
-              </button>
+                  {skill && (
+                    <small>
+                      {skill.readyAt > world.time
+                        ? `${(skill.readyAt - world.time).toFixed(1)}s`
+                        : reason || "使用可能"}
+                    </small>
+                  )}
+                </button>
+                <button
+                  className="upgrade-button"
+                  aria-label={`${slot.toUpperCase()}を強化`}
+                  disabled={!connected || !skill || !!skill.upgradeReason}
+                  title={skill?.upgradeReason || "1ポイントで強化（Ctrl+キー）"}
+                  onClick={() => order("upgrade", { slot })}
+                >
+                  ＋
+                </button>
+              </div>
             );
           })}
-          {props.spells.map((id, i) => (
+          {(self.spells || []).map((spell) => (
             <button
-              disabled
-              key={id}
-              title={`${spellCatalog.find((s) => s.id === id)?.name}（未実装）`}
+              className="skill-button"
+              aria-disabled={!connected || !!spell.reason}
+              aria-pressed={aimSlot === spell.slot}
+              aria-label={`${spell.slot.toUpperCase()} ${spell.name}`}
+              onClick={() => chooseSkill(spell.slot)}
+              key={spell.slot}
+              title={`${spell.name}：${spell.description} CD${spell.cooldown}秒。${spell.reason || "使用可能"}`}
             >
-              <kbd>{"DF"[i]}</kbd>
-              <small>未実装</small>
+              <kbd>{spell.slot.toUpperCase()}</kbd>
+              <small>{spell.name}</small>
+              <small>
+                {spell.readyAt > world.time
+                  ? `${(spell.readyAt - world.time).toFixed(1)}s`
+                  : spell.reason || "使用可能"}
+              </small>
             </button>
           ))}
           <button
@@ -489,6 +532,19 @@ export function GameScene(props: Props) {
         </div>
       </footer>
       <div className="status-strip" aria-label="パッシブ・状態効果">
+        {self.character === "Nadia" && (
+          <span title="通常攻撃3回命中ごとにその攻撃の威力+50%。死亡時にリセット。">
+            過量使用：{self.attackCount} / 3
+          </span>
+        )}
+        {self.character === "Chiyo" && (
+          <span title="開始時にHP60%以上なら通常攻撃・Q・Wの威力+10%。">
+            刀剣拝見：
+            {self.hp >= self.stats.hp * 0.6 && self.hp > 0
+              ? "有効 +10%"
+              : "無効（HP60%未満）"}
+          </span>
+        )}
         {self.character === "Sophie" && (
           <span title="敵キャラへの通常攻撃・スキル命中で移動速度+30、2秒。重複せず更新。">
             播種：命中時に加速
@@ -517,15 +573,17 @@ export function GameScene(props: Props) {
               ? ` ${Math.round(s.value * 100)}%`
               : s.kind === "speed"
                 ? ` +${s.value}`
-                : ""}{" "}
+                : s.kind === "shield"
+                  ? ` 残量${Math.round(s.value)}`
+                  : ""}{" "}
             · {Math.max(0, s.until - world.time).toFixed(1)}秒
           </span>
         ))}
       </div>
       <p className="battle-help">
-        右クリック：移動 / 敵に通常攻撃　 Q/W/E：スキル　 左クリック：照準確定　
-        Esc：照準取消　 S：停止　 B：リコール　 Y：カメラ切替　 Space：自分へ　
-        ホイール：拡大縮小
+        右クリック：移動 / 敵に通常攻撃　 Q/W/E：スキル　 Ctrl+Q/W/E：強化　
+        D/F：スペル　 左クリック：照準確定　 Esc：照準取消　 S：停止　
+        B：リコール　 Y：カメラ切替　 Space：自分へ　 ホイール：拡大縮小
       </p>
     </section>
   );
