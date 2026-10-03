@@ -1,0 +1,11 @@
+.git
+node_modules
+dist
+dist-ssr
+test-results
+tests
+specification
+*.log
+.env
+.env.*
+*.local

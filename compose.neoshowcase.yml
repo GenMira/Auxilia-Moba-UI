@@ -1,0 +1,18 @@
+# Local verification only. NeoShowcase builds each repository independently.
+services:
+  server:
+    build: ../League of Auxilia-server
+    environment:
+      PORT: "8080"
+      COOKIE_SECURE: "false"
+      ALLOWED_ORIGINS: http://127.0.0.1:18080
+  ui:
+    build: .
+    environment:
+      PORT: "8080"
+      BACKEND_URL: http://server:8080
+    ports:
+      - "127.0.0.1:18080:8080"
+    depends_on:
+      server:
+        condition: service_healthy

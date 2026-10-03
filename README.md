@@ -1,5 +1,7 @@
 # League of Auxilia UI
 
+NeoShowcaseでのRuntime登録・環境変数・Docker検証は [デプロイ設定](deploy/README.md) を参照してください。
+
 1対1 MOBAのエントランス、マッチング、ゲームシーン。React / TypeScript / Vite。
 
 ## 起動
